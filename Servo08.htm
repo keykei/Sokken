@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ja">
+<head>
+   	<meta charset="utf-8" />
+   	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>ServoControl App</title>
+        <link rel="stylesheet" href="./jquerymb.css">
+        <script src="./jquery21.js"></script>
+        <script src="./jquerymb.js"></script> 
+</head>
+  
+<style type="text/css">
+
+	body {
+		text-align: center;
+	}
+	canvas {
+		border: 1px solid black;
+	}
+
+	#slider-block { 
+		width: 520px;
+		display: inline-block;
+		_display: inline; 
+	}	
+
+	#button-block { 
+		width: 100px;
+		display: inline-block;
+		_display: inline; 
+	}	
+	
+	#filesel-block { 
+		width: 400px;
+		display: inline-block;
+		_display: inline; 
+	}	
+
+	#openWS {
+		width: 320px;
+		display: inline-block;
+		_display: inline; 
+	}
+	
+</style>
+
+<script>
+	
+window.addEventListener("load", eventWindowLoaded, false);
+function eventWindowLoaded()
+{
+	mainApp();
+}
+      
+function mainApp()	
+{
+	/* WSの処理 */
+	var wsocket;
+		
+	$(document).on("click", "#openWS", openWS);
+	$(document).on("click","#closeWS", closeWS);
+	
+	function openWS()       // websocket接続開始
+	{    
+		wsocket = new WebSocket("ws://192.168.2.216:80");
+    
+		wsocket.onopen = function(e)
+		{
+			alert("open websocket!\n\r接続完了!");
+               	}   
+                
+		wsocket.onclose = function(e)
+                {   
+                       	alert("close websocket.\n\r接続解除!");
+          	}   
+                        
+		wsocket.onerror = function(e)
+                {   
+                 	alert("error!!");
+               	}   
+ 	}   
+
+        function closeWS()      // websocket切断
+        {
+   		wsocket.close();
+        }
+
+
+	/* スライダーの処理 */
+	$(document).on("change", "#sliderX", sliderX);
+	$(document).on("change", "#sliderY", sliderY);
+	
+	var valX, valY, calX, calY;
+
+	function sliderX()
+	{
+		valX = document.getElementById("sliderX").value;
+		calX = "CX:" + valX.toString();
+		wsocket.send(calX);
+	}
+	
+	function sliderY()
+	{
+		valY = document.getElementById("sliderY").value;
+		calY = "CY:" + valY.toString();
+		wsocket.send(calY);
+	}
+
+	/* 値セット，転送ボタンの処理 */
+	$(document).on("click", "#send1", sendVal1);
+	$(document).on("click", "#send2", sendVal2);
+
+	function sendVal1()
+	{
+		wsocket.send("S1\n");
+                alert("最小値を送信しました．");
+
+	}
+
+	function sendVal2()
+	{
+		wsocket.send("S2\n");
+                alert("最大値を送信しました．\nキャリブレーション完了！");
+
+	}
+
+	/* Canvasの処理 */
+	var canvas = document.getElementById("myCanvas");
+         	
+	if(!canvas.getContext){ return; }
+         
+	var ctx = canvas.getContext("2d");
+	var elem = document.getElementById("filesel");
+        elem.addEventListener("change", imgload, false);
+
+         function imgload(e)
+	{
+		if(window.File){ }
+           	else{ alert("!!! You can not use File API !!!"); } 
+            		
+		var tg = e.target;		
+            	var file = tg.files[0];		// ファイル名取得
+            	if (!tg.files.length) return;	// ファイル未選択の場合
+            	if (!/^image\/(png|jpeg|gif)$/.test(file.type)) return;
+
+            	var img = new Image();
+            	var reader = new FileReader(); 
+            		
+		reader.onload = function(ev)
+		{
+               		tg = ev.target;
+               		img.onload = function()
+			{
+                 		/* img.width = canvas.width;
+                 		img.height = canvas.height; */
+                 		
+				ctx.drawImage(img,0,0, 640, 480);
+               		}
+               		
+			img.src = tg.result;
+            	}
+            		
+		reader.readAsDataURL(file);  // 画像データ読み込み
+         } /* imgload */
+
+		
+	var strX, strY;
+			
+	canvas.addEventListener("mousedown", onClick, false);
+	canvas.addEventListener("touchstart", touchStart);
+
+	function onClick(e)
+    {
+		if(e.button === 0)
+	{
+                        var rect = e.target.getBoundingClientRect();
+                        var X = e.clientX - rect.left;
+                        var Y = e.clientY - rect.top;
+
+                        strX = "X:" + X.toString();
+                        strY = "Y:" + Y.toString();
+                        wsocket.send(strX);
+                        wsocket.send(strY);
+                       	//alert("X:" + X + "\nY:" + Y);
+                }
+	}
+
+} /* mainApp */
+
+</script>
+
+	   
+<body>
+	
+	<div id="button-block">
+	<input type="button" id="openWS" value="ON" />
+	</div>
+	<div id="button-block">
+	<input type="button" id="closeWS" value="OFF" />
+	</div>
+   	<div id="filesel-block">
+   	<input type="file" name="file" id="filesel"></input>
+   	</div><!-- filesel-block -->
+	
+   	<div id="canvas-block">
+    <canvas id="myCanvas" width="640" height="480">このブラウザはCanvasに対応していません。</canvas>
+   	</div><!-- canvas-block -->
+
+   	<div id="slider-block">
+	<input type="range" id="sliderX" min="0.1" max="0.2" step="0.001" value="0.15"></input>
+	<input type="range" id="sliderY" min="0.14" max="0.2" step="0.001" value ="0.17"></input>
+   	</div><!-- slider-block -->
+   	
+	<div id="button-block">
+   	<input type="button" id="send1" value="送信1" />
+   	<input type="button" id="send2" value="送信2" />
+   	</div><!-- button-block -->
+   	
+	<br>
+
+</body>
+</html>
